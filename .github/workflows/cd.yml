@@ -1,0 +1,39 @@
+
+name: CD - Deploy Apache to EC2
+
+on:
+  workflow_run:
+    workflows: ["CI - Build and Push Apache Docker Image"]
+    types:
+      - completed
+    branches:
+      - main
+
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: self-hosted
+
+    steps:
+      - name: Pull Apache Docker Image
+        run: docker pull dhruti2005/ec2-apache-cicd:latest
+
+      - name: Stop Existing Apache Container
+        run: |
+          docker stop ec2-apache-cicd || true
+          docker rm ec2-apache-cicd || true
+
+      - name: Stop Host Web Servers
+        run: |
+          sudo systemctl stop nginx || true
+          sudo systemctl stop apache2 || true
+
+      - name: Deploy Apache Container
+        run: |
+          docker run -d \
+            --name ec2-apache-cicd \
+            --restart unless-stopped \
+            -p 80:80 \
+            dhruti2005/ec2-apache-cicd:latest
